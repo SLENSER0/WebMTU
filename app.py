@@ -17,6 +17,16 @@ conn = psycopg2.connect(database="service_db",
 cursor = conn.cursor()
 
 
+class RegisterForm(FlaskForm):
+    username = StringField(validators=[InputRequired(), Length(min=2, max=80)],
+                           render_kw={"placeholder": "Username"})
+    name = StringField(validators=[InputRequired(), Length(min=2, max=80)],
+                       render_kw={"placeholder": "Name"})
+    password = StringField(validators=[InputRequired(), Length(min=2, max=80)],
+                           render_kw={"placeholder": "Password"})
+    submit = SubmitField("register")
+
+
 class LoginForm(FlaskForm):
     username = StringField(validators=[InputRequired(), Length(min=2, max=80)],
                            render_kw={"placeholder": "Username"})
@@ -39,7 +49,7 @@ def login():
         password = form.password.data
 
         cursor.execute("SELECT * FROM service.users WHERE login=%s AND password=%s",
-                      (str(username), str(password)))
+                       (str(username), str(password)))
         records = list(cursor.fetchall())
         if len(records) != 0:
             return render_template('account.html', full_name=records[0][1],
@@ -49,6 +59,29 @@ def login():
 
     return render_template('login.html', form=form)
 
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    form = RegisterForm()
+
+    if form.validate_on_submit():
+        username = form.username.data
+        name = form.name.data
+        password = form.password.data
+
+        cursor.execute(f"SELECT EXISTS(SELECT login FROM service.users WHERE login='{username}')")
+        exist = cursor.fetchone()[0]
+        if not exist:
+            sql_query = "INSERT INTO service.users (full_name, login, password) VALUES (%s, %s, %s)"
+            user_data = (name, username, password)
+
+            cursor.execute(sql_query,user_data)
+            conn.commit()
+
+
+        else:
+            flash("This username already exist")
+    return render_template('register.html', form=form)
 
 if __name__ == '__main__':
     app.run(debug=True)
